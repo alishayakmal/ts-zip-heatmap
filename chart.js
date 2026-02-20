@@ -6,44 +6,46 @@
     if (status) status.textContent = String(msg);
   }
 
-  function fail(msg, err) {
-    const detail = err ? `\n\n${err.stack || err.message || err}` : "";
-    setStatus(`${msg}${detail}`);
+  async function fetchFirstWorkingJson(urls) {
+    let lastErr = null;
+
+    for (const url of urls) {
+      try {
+        setStatus(`Trying GeoJSON source:\n${url}`);
+
+        const resp = await fetch(url, { cache: "no-store" });
+        if (!resp.ok) {
+          lastErr = new Error(`HTTP ${resp.status} ${resp.statusText}`);
+          continue;
+        }
+
+        return await resp.json();
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    throw lastErr || new Error("All GeoJSON sources failed");
   }
 
   try {
-    setStatus("Starting");
-
-    if (!window.deck) {
-      fail("Deck.gl did not load. The script tag in index.html is failing.");
+    if (!window.deck || !window.deck.DeckGL || !window.deck.GeoJsonLayer) {
+      setStatus("Deck.gl did not load correctly. Check the script tag in index.html.");
       return;
     }
 
     const DeckGL = window.deck.DeckGL;
     const GeoJsonLayer = window.deck.GeoJsonLayer;
 
-    if (!DeckGL) {
-      fail("DeckGL is missing on the deck global. Deck.gl bundle did not initialize correctly.");
-      return;
-    }
-
-    if (!GeoJsonLayer) {
-      fail("GeoJsonLayer is missing. This deck.gl bundle did not include layers.");
-      return;
-    }
-
     setStatus("Loading ZIP GeoJSON");
 
-    const geojsonUrl =
-      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json";
+    const geojsonUrls = [
+      "https://cdn.statically.io/gh/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json",
+      "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json",
+      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
+    ];
 
-    const resp = await fetch(geojsonUrl, { cache: "no-store" });
-    if (!resp.ok) {
-      fail(`GeoJSON download failed. HTTP ${resp.status} ${resp.statusText}`);
-      return;
-    }
-
-    const geojson = await resp.json();
+    const geojson = await fetchFirstWorkingJson(geojsonUrls);
 
     setStatus("Rendering map");
 
@@ -62,17 +64,13 @@
       parent: root,
       width: "100%",
       height: "100%",
-      initialViewState: {
-        longitude: -98,
-        latitude: 39,
-        zoom: 3
-      },
+      initialViewState: { longitude: -98, latitude: 39, zoom: 3 },
       controller: true,
       layers: [layer]
     });
 
     setStatus("Self test mode map rendered");
   } catch (e) {
-    fail("Chart crashed while loading.", e);
+    setStatus(`GeoJSON load failed.\n${e && (e.message || e.toString())}`);
   }
 })();
