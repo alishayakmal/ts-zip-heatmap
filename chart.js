@@ -1,19 +1,64 @@
 (async function () {
-
   const root = document.getElementById("root");
+  const status = document.getElementById("status");
 
-  // -----------------------------
-  // SELF TEST MODE (GitHub Pages)
-  // -----------------------------
-  if (typeof window.viz === "undefined") {
+  function setStatus(msg) {
+    if (status) status.textContent = String(msg);
+  }
 
-    root.innerHTML = "Loading ZIP polygons";
+  function fail(msg, err) {
+    const detail = err ? `\n\n${err.stack || err.message || err}` : "";
+    setStatus(`${msg}${detail}`);
+  }
 
-    const geojson = await fetch(
-      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
-    ).then(r => r.json());
+  try {
+    setStatus("Starting");
 
-    new deck.DeckGL({
+    if (!window.deck) {
+      fail("Deck.gl did not load. The script tag in index.html is failing.");
+      return;
+    }
+
+    const DeckGL = window.deck.DeckGL;
+    const GeoJsonLayer = window.deck.GeoJsonLayer;
+
+    if (!DeckGL) {
+      fail("DeckGL is missing on the deck global. Deck.gl bundle did not initialize correctly.");
+      return;
+    }
+
+    if (!GeoJsonLayer) {
+      fail("GeoJsonLayer is missing. This deck.gl bundle did not include layers.");
+      return;
+    }
+
+    setStatus("Loading ZIP GeoJSON");
+
+    const geojsonUrl =
+      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json";
+
+    const resp = await fetch(geojsonUrl, { cache: "no-store" });
+    if (!resp.ok) {
+      fail(`GeoJSON download failed. HTTP ${resp.status} ${resp.statusText}`);
+      return;
+    }
+
+    const geojson = await resp.json();
+
+    setStatus("Rendering map");
+
+    const layer = new GeoJsonLayer({
+      id: "zip-layer",
+      data: geojson,
+      filled: true,
+      stroked: true,
+      getFillColor: [0, 180, 0, 120],
+      getLineColor: [255, 255, 255, 60],
+      lineWidthMinPixels: 0.2,
+      pickable: true
+    });
+
+    new DeckGL({
       parent: root,
       width: "100%",
       height: "100%",
@@ -23,78 +68,11 @@
         zoom: 3
       },
       controller: true,
-      layers: [
-        new deck.GeoJsonLayer({
-          id: "zip-layer",
-          data: geojson,
-          filled: true,
-          stroked: false,
-          getFillColor: [0,180,0,120]
-        })
-      ]
+      layers: [layer]
     });
 
-    return;
+    setStatus("Self test mode map rendered");
+  } catch (e) {
+    fail("Chart crashed while loading.", e);
   }
-
-  // -----------------------------
-  // THOUGHTSPOT MODE
-  // -----------------------------
-  const context = viz.getChartContext();
-
-  const data = await context.getData();
-
-  const zipMap = {};
-  data.forEach(row => {
-    zipMap[row["Zipcode"]] = row["Impressions"];
-  });
-
-  const geojson = await fetch(
-    "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
-  ).then(r => r.json());
-
-  new deck.DeckGL({
-    parent: root,
-    width: "100%",
-    height: "100%",
-    initialViewState: {
-      longitude: -98,
-      latitude: 39,
-      zoom: 3
-    },
-    controller: true,
-    layers: [
-      new deck.GeoJsonLayer({
-        id: "zip-layer",
-        data: geojson,
-        filled: true,
-        stroked: false,
-        getFillColor: f => {
-
-          const zip = f.properties.ZCTA5CE10;
-          const value = zipMap[zip] || 0;
-
-          if (value > 100000) return [0,120,0,200];
-          if (value > 50000) return [0,180,0,180];
-          if (value > 10000) return [120,220,0,160];
-          return [200,240,200,120];
-        },
-        pickable: true,
-        onHover: ({object, x, y}) => {
-
-          if (!object) return;
-
-          const zip = object.properties.ZCTA5CE10;
-          const value = zipMap[zip] || 0;
-
-          context.showTooltip({
-            x,
-            y,
-            content: `ZIP ${zip} — Impressions: ${value}`
-          });
-        }
-      })
-    ]
-  });
-
 })();
