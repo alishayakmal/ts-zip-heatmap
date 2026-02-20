@@ -1,5 +1,16 @@
 (async function () {
 
+  document.body.innerHTML = "";
+  const banner = document.createElement("div");
+  banner.style.padding = "12px";
+  banner.style.fontFamily = "Arial";
+  banner.style.fontSize = "16px";
+  banner.style.background = "#fff3cd";
+  banner.style.border = "1px solid #ffeeba";
+  banner.style.margin = "8px";
+  banner.textContent = "NEW BUILD v30001 loaded. If you still see 'Rendered smoke test subset successfully' you are not on the new code.";
+  document.body.appendChild(banner);
+
   const status = document.createElement("div");
   status.style.position = "fixed";
   status.style.top = "8px";
@@ -11,17 +22,13 @@
   status.style.zIndex = "9999";
   document.body.appendChild(status);
 
-  function setStatus(t) {
-    status.textContent = t;
-  }
+  function setStatus(t) { status.textContent = t; }
 
-  function baseUrl() {
-    return new URL("./", window.location.href).href;
-  }
+  function baseUrl() { return new URL("./", window.location.href).href; }
 
   async function loadTopo(prefix) {
     const url = baseUrl() + `zcta_zip1_${prefix}.topo.json`;
-    setStatus(`Loading ZIP prefix ${prefix}`);
+    setStatus(`Loading ZIP prefix ${prefix} from ${url}`);
     const r = await fetch(url, { cache: "no-store" });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return await r.json();
@@ -29,9 +36,6 @@
 
   try {
 
-    setStatus("Reading ThoughtSpot data");
-
-    // TEMP MOCK DATA — replace later with TS dataset
     const rows = [
       { zip: "90210", value: 10 },
       { zip: "10001", value: 20 },
@@ -40,11 +44,9 @@
 
     const prefixes = [...new Set(rows.map(r => r.zip.charAt(0)))];
 
-    setStatus(`Need ${prefixes.length} topology files`);
+    setStatus(`Need ${prefixes.length} topology files: ${prefixes.join(", ")}`);
 
     const topoList = await Promise.all(prefixes.map(p => loadTopo(p)));
-
-    setStatus("Combining features");
 
     let features = [];
 
@@ -75,7 +77,7 @@
     ctx.lineWidth = 0.35;
     ctx.stroke();
 
-    setStatus("ZIP heatmap ready");
+    setStatus("DONE v30001");
 
   } catch (e) {
     setStatus(`Load failed: ${e.message || e}`);
