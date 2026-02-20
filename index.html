@@ -1,34 +1,49 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="UTF-8" />
-  <title>TS ZIP Heatmap</title>
-
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- D3 + TopoJSON -->
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZIP Heatmap</title>
 
   <style>
-    body {
+    html, body {
       margin: 0;
-      font-family: Arial;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
     }
 
-    canvas {
-      width: 100vw;
-      height: 100vh;
+    #root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    #status {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 9999;
+      background: rgba(255,255,255,0.95);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 90vw;
+      white-space: pre-wrap;
     }
   </style>
+
+  <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
+  <script src="https://unpkg.com/topojson-client@3/dist/topojson-client.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 </head>
 
 <body>
+  <div id="root">
+    <div id="status">Loading</div>
+  </div>
 
-  <canvas id="zipMap"></canvas>
-
-  <script src="chart.js"></script>
-
+  <script src="./chart.js?v=30"></script>
 </body>
 </html>
