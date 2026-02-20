@@ -1,29 +1,46 @@
 <!DOCTYPE html>
 <html>
 <head>
-<meta charset="utf-8" />
-<title>ZIP Heatmap</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZIP Heatmap</title>
 
-<style>
-html, body {
-  margin: 0;
-  height: 100%;
-}
-#root {
-  width: 100%;
-  height: 100vh;
-}
-</style>
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+    #root {
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+    #status {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      z-index: 9999;
+      background: rgba(255,255,255,0.95);
+      padding: 6px 8px;
+      border-radius: 6px;
+      font-size: 12px;
+      max-width: 90vw;
+      white-space: pre-wrap;
+    }
+  </style>
 
-<script src="https://unpkg.com/deck.gl@8.9.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/layers@8.9.0/dist.min.js"></script>
-<script src="https://unpkg.com/@deck.gl/geo-layers@8.9.0/dist.min.js"></script>
-
+  <script src="https://unpkg.com/deck.gl@8.9.36/dist.min.js"></script>
 </head>
+
 <body>
+  <div id="root">
+    <div id="status">Loading</div>
+  </div>
 
-<div id="root"></div>
-<script src="chart.js"></script>
-
+  <!-- Cache bust so you always load the latest -->
+  <script src="./chart.js?v=3"></script>
 </body>
 </html>
