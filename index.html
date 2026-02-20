@@ -1,17 +1,52 @@
-<!DOCTYPE html>
+<!doctype html>
 <html>
-<head>
-  <meta charset="utf-8">
-  <title>ZIP Heatmap Smoke Test</title>
-  <script src="https://d3js.org/d3.v7.min.js"></script>
-  <script src="https://unpkg.com/topojson-client@3"></script>
-  <style>
-    html, body { margin: 0; height: 100%; }
-    #status { position: fixed; top: 8px; left: 8px; background: #fff; padding: 6px 8px; font-family: Arial; font-size: 12px; z-index: 9999; }
-  </style>
-</head>
-<body>
-  <div id="status">Starting</div>
-  <script src="./chart.js?v=30002"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ZIP Heatmap</title>
+    <style>
+      html, body { margin: 0; height: 100%; width: 100%; overflow: hidden; background: #fff; }
+      #wrap { position: relative; height: 100%; width: 100%; }
+      canvas { display: block; }
+      #tooltip {
+        position: absolute;
+        pointer-events: none;
+        background: rgba(255,255,255,0.98);
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 6px;
+        padding: 8px 10px;
+        font-family: Arial;
+        font-size: 12px;
+        box-shadow: 0 6px 18px rgba(0,0,0,0.12);
+        display: none;
+        max-width: 280px;
+      }
+      #status {
+        position: absolute;
+        top: 8px;
+        left: 8px;
+        background: rgba(255,255,255,0.95);
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 6px;
+        padding: 6px 8px;
+        font-family: Arial;
+        font-size: 12px;
+      }
+      .ttTitle { font-weight: 700; margin-bottom: 6px; }
+      .ttRow { display: flex; justify-content: space-between; gap: 12px; }
+      .ttKey { color: rgba(0,0,0,0.65); }
+      .ttVal { font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <div id="wrap">
+      <div id="status">Loading</div>
+      <div id="tooltip"></div>
+      <canvas id="c"></canvas>
+    </div>
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <script src="./chart.js?v=50001"></script>
+  </body>
 </html>
