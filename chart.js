@@ -1,36 +1,34 @@
 (async function () {
   const root = document.getElementById("root");
 
-  // Initialize ThoughtSpot chart context
-  const ctx = await window.tssdk.getChartContext();
+  function setMessage(msg) {
+    root.innerHTML = `<div style="font-family: Arial; padding: 12px;">${msg}</div>`;
+  }
 
-  async function render() {
-    root.innerHTML = "";
+  // Deck and topojson must load from index.html
+  if (!window.deck) {
+    setMessage("Deck.gl did not load. Check the deck.gl script tag in index.html.");
+    return;
+  }
+  if (!window.topojson) {
+    setMessage("TopoJSON client did not load. Check the topojson script tag in index.html.");
+    return;
+  }
 
-    // Get data from ThoughtSpot
-    const dataResponse = await ctx.getData();
-    const rows = dataResponse?.data ?? [];
+  // Detect ThoughtSpot SDK global safely
+  const sdk =
+    window.tssdk ||
+    window.tsChartSdk ||
+    window.tsChartSDK ||
+    window.TSChartSDK ||
+    null;
 
-    // Build lookup table by ZIP
-    const byZip = new Map();
+  const isInsideThoughtSpot = !!(sdk && typeof sdk.getChartContext === "function");
 
-    rows.forEach(r => {
-      const zip = String(
-        r["ZIP"] ??
-        r["Tes"] ??
-        r["ZCTA5CE10"] ??
-        ""
-      ).padStart(5, "0");
+  // Self test mode when you open GitHub Pages directly
+  if (!isInsideThoughtSpot) {
+    setMessage("Self test mode. Rendering ZIP polygons without ThoughtSpot data.");
 
-      byZip.set(zip, {
-        impressions: Number(r["Total Impressions"] ?? 0),
-        conversions: Number(r["Conversions"] ?? 0),
-        spend: Number(r["Spend"] ?? 0),
-        cvr: Number(r["Conversion Rate"] ?? 0)
-      });
-    });
-
-    // Load USA ZIP boundaries from CDN
     const topo = await fetch(
       "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta.topo.json"
     ).then(r => r.json());
@@ -38,16 +36,58 @@
     const objectKey = Object.keys(topo.objects)[0];
     const geo = window.topojson.feature(topo, topo.objects[objectKey]);
 
-    // Inject ThoughtSpot metrics into polygons
+    const { DeckGL, PolygonLayer } = window.deck;
+
+    new DeckGL({
+      parent: root,
+      controller: true,
+      initialViewState: { longitude: -98, latitude: 39, zoom: 3 },
+      layers: [
+        new PolygonLayer({
+          id: "self-test",
+          data: geo.features,
+          getPolygon: f => f.geometry.coordinates,
+          getFillColor: [200, 230, 200, 180],
+          getLineColor: [255, 255, 255, 60],
+          lineWidthMinPixels: 0.2,
+          pickable: false
+        })
+      ]
+    });
+
+    return;
+  }
+
+  // Normal ThoughtSpot mode
+  const ctx = await sdk.getChartContext();
+
+  async function render() {
+    root.innerHTML = "";
+
+    const dataResponse = await ctx.getData();
+    const rows = dataResponse?.data ?? [];
+
+    const byZip = new Map();
+    for (const r of rows) {
+      const zip = String(r["ZIP"] ?? r["Zipcode"] ?? r["Tes"] ?? "").padStart(5, "0");
+      byZip.set(zip, {
+        impressions: Number(r["Impressions"] ?? r["Total Impressions"] ?? 0),
+        conversions: Number(r["Conversions"] ?? 0),
+        spend: Number(r["Spend"] ?? 0),
+        cvr: Number(r["Conversion Rate"] ?? 0)
+      });
+    }
+
+    const topo = await fetch(
+      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta.topo.json"
+    ).then(r => r.json());
+
+    const objectKey = Object.keys(topo.objects)[0];
+    const geo = window.topojson.feature(topo, topo.objects[objectKey]);
+
     geo.features.forEach(f => {
-      const zipKey = String(
-        f.properties.ZCTA5CE10 ??
-        f.properties.ZIP_CODE ??
-        ""
-      ).padStart(5, "0");
-
+      const zipKey = String(f.properties.ZCTA5CE10 ?? f.properties.ZIP_CODE ?? "").padStart(5, "0");
       const m = byZip.get(zipKey);
-
       f.properties.__zip = zipKey;
       f.properties.__impressions = m?.impressions ?? 0;
       f.properties.__conversions = m?.conversions ?? 0;
@@ -55,7 +95,6 @@
       f.properties.__cvr = m?.cvr ?? 0;
     });
 
-    // Build green color ramp
     const values = geo.features.map(f => f.properties.__impressions);
     const max = Math.max(1, ...values);
 
@@ -74,11 +113,7 @@
     new DeckGL({
       parent: root,
       controller: true,
-      initialViewState: {
-        longitude: -98,
-        latitude: 39,
-        zoom: 3
-      },
+      initialViewState: { longitude: -98, latitude: 39, zoom: 3 },
       layers: [
         new PolygonLayer({
           id: "zip-heatmap",
@@ -94,7 +129,6 @@
       getTooltip: ({ object }) => {
         if (!object) return null;
         const p = object.properties;
-
         return {
           html: `
             <div style="font-family: Arial; font-size: 12px;">
