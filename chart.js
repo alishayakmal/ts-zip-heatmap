@@ -1,76 +1,63 @@
 (async function () {
-  const root = document.getElementById("root");
-  const status = document.getElementById("status");
 
-  function setStatus(msg) {
-    if (status) status.textContent = String(msg);
-  }
+  console.log("Loading ZIP polygons...");
 
-  async function fetchFirstWorkingJson(urls) {
-    let lastErr = null;
+  // IMPORTANT
+  // This must match your repo filename EXACTLY
+  const GEO_URL = "./tl_2020_us_zcta520.topo.json";
 
-    for (const url of urls) {
-      try {
-        setStatus(`Trying GeoJSON source:\n${url}`);
+  // Load topojson
+  const topo = await fetch(GEO_URL).then(r => r.json());
 
-        const resp = await fetch(url, { cache: "no-store" });
-        if (!resp.ok) {
-          lastErr = new Error(`HTTP ${resp.status} ${resp.statusText}`);
-          continue;
-        }
+  console.log("TopoJSON loaded");
 
-        return await resp.json();
-      } catch (e) {
-        lastErr = e;
-      }
-    }
+  // Convert to GeoJSON
+  const geo = topojson.feature(
+    topo,
+    topo.objects[Object.keys(topo.objects)[0]]
+  );
 
-    throw lastErr || new Error("All GeoJSON sources failed");
-  }
+  console.log("GeoJSON features:", geo.features.length);
 
-  try {
-    if (!window.deck || !window.deck.DeckGL || !window.deck.GeoJsonLayer) {
-      setStatus("Deck.gl did not load correctly. Check the script tag in index.html.");
-      return;
-    }
+  // Fake demo values so you SEE colors
+  const values = {};
+  geo.features.forEach(f => {
+    values[f.properties.ZCTA5CE20] = Math.random();
+  });
 
-    const DeckGL = window.deck.DeckGL;
-    const GeoJsonLayer = window.deck.GeoJsonLayer;
+  const canvas = document.getElementById("zipMap");
+  const ctx = canvas.getContext("2d");
 
-    setStatus("Loading ZIP GeoJSON");
+  // Projection
+  const projection = d3.geoAlbersUsa()
+    .scale(1300)
+    .translate([window.innerWidth / 2, window.innerHeight / 2]);
 
-    const geojsonUrls = [
-      "https://cdn.statically.io/gh/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json",
-      "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json",
-      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
-    ];
+  const path = d3.geoPath().projection(projection).context(ctx);
 
-    const geojson = await fetchFirstWorkingJson(geojsonUrls);
+  function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
 
-    setStatus("Rendering map");
+    geo.features.forEach(feature => {
 
-    const layer = new GeoJsonLayer({
-      id: "zip-layer",
-      data: geojson,
-      filled: true,
-      stroked: true,
-      getFillColor: [0, 180, 0, 120],
-      getLineColor: [255, 255, 255, 60],
-      lineWidthMinPixels: 0.2,
-      pickable: true
+      const zip = feature.properties.ZCTA5CE20;
+      const v = values[zip] || 0;
+
+      // heat color
+      ctx.fillStyle = `rgba(255,0,0,${v})`;
+      ctx.strokeStyle = "rgba(255,255,255,0.1)";
+      ctx.lineWidth = 0.3;
+
+      ctx.beginPath();
+      path(feature);
+      ctx.fill();
+      ctx.stroke();
     });
-
-    new DeckGL({
-      parent: root,
-      width: "100%",
-      height: "100%",
-      initialViewState: { longitude: -98, latitude: 39, zoom: 3 },
-      controller: true,
-      layers: [layer]
-    });
-
-    setStatus("Self test mode map rendered");
-  } catch (e) {
-    setStatus(`GeoJSON load failed.\n${e && (e.message || e.toString())}`);
   }
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  draw();
+
 })();
