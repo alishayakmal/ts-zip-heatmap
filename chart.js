@@ -7,10 +7,10 @@
   // -----------------------------
   if (typeof window.viz === "undefined") {
 
-    root.innerHTML = "Self test mode. Rendering ZIP polygons without ThoughtSpot data.";
+    root.innerHTML = "Loading ZIP polygons";
 
     const geojson = await fetch(
-      "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json"
+      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
     ).then(r => r.json());
 
     new deck.DeckGL({
@@ -29,7 +29,7 @@
           data: geojson,
           filled: true,
           stroked: false,
-          getFillColor: [0, 180, 0, 120]
+          getFillColor: [0,180,0,120]
         })
       ]
     });
@@ -50,7 +50,7 @@
   });
 
   const geojson = await fetch(
-    "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json"
+    "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta5.json"
   ).then(r => r.json());
 
   new deck.DeckGL({
@@ -70,6 +70,7 @@
         filled: true,
         stroked: false,
         getFillColor: f => {
+
           const zip = f.properties.ZCTA5CE10;
           const value = zipMap[zip] || 0;
 
@@ -80,7 +81,9 @@
         },
         pickable: true,
         onHover: ({object, x, y}) => {
+
           if (!object) return;
+
           const zip = object.properties.ZCTA5CE10;
           const value = zipMap[zip] || 0;
 
