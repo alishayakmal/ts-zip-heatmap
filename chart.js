@@ -1,144 +1,97 @@
 (async function () {
+
   const root = document.getElementById("root");
-  const status = document.getElementById("status");
 
-  function setStatus(msg) {
-    if (status) status.textContent = msg;
-  }
+  // -----------------------------
+  // SELF TEST MODE (GitHub Pages)
+  // -----------------------------
+  if (typeof window.viz === "undefined") {
 
-  if (!window.deck) {
-    setStatus("Deck.gl missing. Check index.html script tags.");
-    return;
-  }
-  if (!window.topojson) {
-    setStatus("TopoJSON client missing. Check index.html script tags.");
-    return;
-  }
+    root.innerHTML = "Self test mode. Rendering ZIP polygons without ThoughtSpot data.";
 
-  const sdk =
-    window.tssdk ||
-    window.tsChartSdk ||
-    window.tsChartSDK ||
-    window.TSChartSDK ||
-    null;
-
-  const isInsideThoughtSpot = !!(sdk && typeof sdk.getChartContext === "function");
-
-  async function loadZipPolygons() {
-    setStatus("Loading ZIP polygons");
-    const topo = await fetch(
-      "https://cdn.jsdelivr.net/gh/OpenDataDE/State-zip-code-GeoJSON@master/zcta.topo.json"
+    const geojson = await fetch(
+      "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json"
     ).then(r => r.json());
 
-    const objectKey = Object.keys(topo.objects)[0];
-    return window.topojson.feature(topo, topo.objects[objectKey]);
-  }
-
-  function renderMap(features, getValueFn) {
-    const { DeckGL, PolygonLayer } = window.deck;
-
-    const values = features.map(f => getValueFn(f));
-    const max = Math.max(1, ...values);
-
-    function greenRamp(v) {
-      const t = Math.max(0, Math.min(1, v / max));
-      return [
-        Math.round(229 - 180 * t),
-        Math.round(245 - 120 * t),
-        Math.round(224 - 160 * t),
-        200
-      ];
-    }
-
-    setStatus(isInsideThoughtSpot ? "Rendering ThoughtSpot map" : "Self test mode");
-
-    new DeckGL({
+    new deck.DeckGL({
       parent: root,
+      width: "100%",
+      height: "100%",
+      initialViewState: {
+        longitude: -98,
+        latitude: 39,
+        zoom: 3
+      },
       controller: true,
-      initialViewState: { longitude: -98, latitude: 39, zoom: 3 },
       layers: [
-        new PolygonLayer({
-          id: "zip-polygons",
-          data: features,
-          getPolygon: f => f.geometry.coordinates,
-          getFillColor: f => greenRamp(getValueFn(f)),
-          getLineColor: [255, 255, 255, 70],
-          lineWidthMinPixels: 0.4,
-          pickable: true,
-          autoHighlight: true
+        new deck.GeoJsonLayer({
+          id: "zip-layer",
+          data: geojson,
+          filled: true,
+          stroked: false,
+          getFillColor: [0, 180, 0, 120]
         })
-      ],
-      getTooltip: ({ object }) => {
-        if (!object) return null;
-        const p = object.properties || {};
-        const zip = String(p.ZCTA5CE10 ?? p.ZIP_CODE ?? "").padStart(5, "0");
-        const imp = p.__impressions ?? 0;
-        const conv = p.__conversions ?? 0;
-        const spend = p.__spend ?? 0;
-        const cvr = p.__cvr ?? 0;
-
-        return {
-          html: `
-            <div style="font-family: Arial; font-size: 12px;">
-              <div><b>ZIP</b>: ${zip}</div>
-              <div><b>Impressions</b>: ${Number(imp).toLocaleString()}</div>
-              <div><b>Conversions</b>: ${Number(conv).toLocaleString()}</div>
-              <div><b>Spend</b>: ${Number(spend).toLocaleString()}</div>
-              <div><b>Conversion rate</b>: ${cvr}</div>
-            </div>
-          `
-        };
-      }
-    });
-  }
-
-  if (!isInsideThoughtSpot) {
-    const geo = await loadZipPolygons();
-
-    geo.features.forEach(f => {
-      f.properties = f.properties || {};
-      f.properties.__impressions = 1;
+      ]
     });
 
-    renderMap(geo.features, f => f.properties.__impressions);
     return;
   }
 
-  const ctx = await sdk.getChartContext();
+  // -----------------------------
+  // THOUGHTSPOT MODE
+  // -----------------------------
+  const context = viz.getChartContext();
 
-  async function renderFromThoughtSpot() {
-    setStatus("Reading ThoughtSpot data");
+  const data = await context.getData();
 
-    const dataResponse = await ctx.getData();
-    const rows = dataResponse?.data ?? [];
+  const zipMap = {};
+  data.forEach(row => {
+    zipMap[row["Zipcode"]] = row["Impressions"];
+  });
 
-    const byZip = new Map();
-    for (const r of rows) {
-      const zip = String(r["ZIP"] ?? r["Zipcode"] ?? r["Tes"] ?? "").padStart(5, "0");
-      byZip.set(zip, {
-        impressions: Number(r["Impressions"] ?? r["Total Impressions"] ?? 0),
-        conversions: Number(r["Conversions"] ?? 0),
-        spend: Number(r["Spend"] ?? 0),
-        cvr: Number(r["Conversion Rate"] ?? 0)
-      });
-    }
+  const geojson = await fetch(
+    "https://raw.githubusercontent.com/OpenDataDE/State-zip-code-GeoJSON/master/zcta5.json"
+  ).then(r => r.json());
 
-    const geo = await loadZipPolygons();
+  new deck.DeckGL({
+    parent: root,
+    width: "100%",
+    height: "100%",
+    initialViewState: {
+      longitude: -98,
+      latitude: 39,
+      zoom: 3
+    },
+    controller: true,
+    layers: [
+      new deck.GeoJsonLayer({
+        id: "zip-layer",
+        data: geojson,
+        filled: true,
+        stroked: false,
+        getFillColor: f => {
+          const zip = f.properties.ZCTA5CE10;
+          const value = zipMap[zip] || 0;
 
-    geo.features.forEach(f => {
-      f.properties = f.properties || {};
-      const zipKey = String(f.properties.ZCTA5CE10 ?? f.properties.ZIP_CODE ?? "").padStart(5, "0");
-      const m = byZip.get(zipKey);
+          if (value > 100000) return [0,120,0,200];
+          if (value > 50000) return [0,180,0,180];
+          if (value > 10000) return [120,220,0,160];
+          return [200,240,200,120];
+        },
+        pickable: true,
+        onHover: ({object, x, y}) => {
+          if (!object) return;
+          const zip = object.properties.ZCTA5CE10;
+          const value = zipMap[zip] || 0;
 
-      f.properties.__impressions = m?.impressions ?? 0;
-      f.properties.__conversions = m?.conversions ?? 0;
-      f.properties.__spend = m?.spend ?? 0;
-      f.properties.__cvr = m?.cvr ?? 0;
-    });
+          context.showTooltip({
+            x,
+            y,
+            content: `ZIP ${zip} — Impressions: ${value}`
+          });
+        }
+      })
+    ]
+  });
 
-    renderMap(geo.features, f => f.properties.__impressions);
-  }
-
-  ctx.on(ctx.Event.QueryChanged, renderFromThoughtSpot);
-  await renderFromThoughtSpot();
 })();
